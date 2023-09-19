@@ -87,6 +87,7 @@ class To_Tensor(object):
 
         image = sample['image']
         label = sample['label']
+        # print('old ',sample['label'].dtype)
         
         # expand dims
         new_image = np.expand_dims(image,axis=0)
@@ -99,6 +100,7 @@ class To_Tensor(object):
         # convert to Tensor
         sample['image'] = torch.from_numpy(new_image)
         sample['label'] = torch.from_numpy(new_label)
+        # print('new',sample['label'].dtype)
         return sample
 
 

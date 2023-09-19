@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import random
 from skimage.metrics import hausdorff_distance
+import json
 
 def binary_dice(y_true, y_pred):
     smooth = 1e-7
@@ -191,6 +192,12 @@ def dfs_rename_weight(ckpt_path):
             rename_weight_path(ckpt_path)
             break  
 
+
+def save_list_as_json(message_list, path=None):
+    if path:
+        with open(path, 'w') as fp:
+            json.dump(message_list, fp, indent=4, separators=(',',':'))
+            
 
 if __name__ == "__main__":
     # input_path = "/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/lung.csv"

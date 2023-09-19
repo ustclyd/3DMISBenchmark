@@ -126,3 +126,5 @@ class RandomFlip3D(object):
         sample['image'] = image
         sample['label'] = label
         return sample
+
+

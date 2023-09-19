@@ -17,8 +17,12 @@ class CrossentropyLoss(torch.nn.CrossEntropyLoss):
             target = torch.argmax(target,1)
         target = target.long()
         num_classes = inp.size()[1]
-
-        inp = inp.permute(0, 2, 3, 1).contiguous().view(-1, num_classes)
+        if len(inp.size()) == 4:
+            inp = inp.permute(0, 2, 3, 1).contiguous().view(-1, num_classes)
+        elif len(inp.size()) == 5:
+            inp = inp.permute(0, 2, 3, 4, 1).contiguous().view(-1, num_classes)
+        else:
+            raise NotImplementedError("Only 2d and 3d data mode are available in CrossEntrophyLoss.")
         target = target.view(-1,)
 
         return super(CrossentropyLoss, self).forward(inp, target)

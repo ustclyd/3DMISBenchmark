@@ -9,15 +9,15 @@ from utils import get_weight_path
 
 __disease__ = ['Cervical','Nasopharynx','Structseg_HaN','Structseg_THOR','SegTHOR','Lung']
 # __2d_net__ = ['unet_2d']  old ./ckpt
-__2d_net__ = ['unet','unet++','FPN','deeplabv3+','att_unet','res_unet']
-__trans_net__ = ['UTNet','UTNet_encoder','TransUNet','ResNet_UTNet','SwinUNet']
-__new_net__ = ['sfnet']
+__2d_net__ = ['unet','unet++','FPN','deeplabv3+','att_unet','res_unet'] # 1,2,3,4,5,6
+__trans_net__ = ['UTNet','UTNet_encoder','TransUNet','ResNet_UTNet','SwinUNet'] # 7,8,9,10,11
+__new_net__ = ['sfnet'] # 12
 __encoder_name__ = ['simplenet','resnet18','resnet34','resnet50','se_resnet50', \
                    'resnext50_32x4d','timm-resnest14d','timm-resnest26d','timm-resnest50d', \
-                    'efficientnet-b4', 'efficientnet-b5']
+                    'efficientnet-b4', 'efficientnet-b5'] # 0 ~ 10
 
-__new_encoder_name__ = ['swin_transformer','swinplusr18']
-__3d_net__ = ['unet_3d','da_unet','da_se_unet','res_da_se_unet']
+__new_encoder_name__ = ['swin_transformer','swinplusr18'] # 11, 12
+__3d_net__ = ['unet_3d','da_unet','da_se_unet','res_da_se_unet', 'vnet_lite', 'UNETR', 'vnet'] # 13, 14, 15, 16, 17, 18
 __mode__ = ['2d','2d_clean','3d']
 
 json_path = {
@@ -25,28 +25,28 @@ json_path = {
     'Nasopharynx':'/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/Nasopharynx_Oar.json',
     'Liver':'/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/Liver_Oar.json',
     'Stomach':'/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/Stomach_Oar.json',
-    'Structseg_HaN':'/staff/shijun/torch_projects/Med_Seg/converter/nii_converter/static_files/Structseg_HaN.json',
+    'Structseg_HaN':'/staff/zzq/code/3DMISBenchmark/dataset/StructSeg-HaN/Structseg_HaN.json',
     'Structseg_THOR':'/staff/shijun/torch_projects/Med_Seg/converter/nii_converter/static_files/Structseg_THOR.json',
     'HaN_GTV':'/staff/shijun/torch_projects/Med_Seg/converter/nii_converter/static_files/HaN_GTV.json',
     'THOR_GTV':'/staff/shijun/torch_projects/Med_Seg/converter/nii_converter/static_files/THOR_GTV.json',
-    'SegTHOR':'/staff/shijun/torch_projects/Med_Seg/converter/nii_converter/static_files/SegTHOR.json',
+    'SegTHOR':'/staff/zzq/code/3DMISBenchmark/dataset/SegTHOR/SegTHOR.json',
     'Covid-Seg':'/staff/shijun/torch_projects/Med_Seg/converter/nii_converter/static_files/Covid-Seg.json', # competition
     'Lung':'/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/Lung_Oar.json',
     'Lung_Tumor':'/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/Lung_Tumor.json',
     'Nasopharynx_Tumor':'/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/Nasopharynx_Tumor.json',
     'Cervical_Tumor':'/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/Cervical_Tumor.json',
     'EGFR':'/staff/shijun/torch_projects/Med_Seg/converter/dcm_converter/static_files/EGFR.json',
-    'LITS':'/staff/shijun/torch_projects/Med_Seg/converter/nii_converter/static_files/LITS.json', # competition
+    'LITS':'/staff/zzq/code/3DMISBenchmark/dataset/LiTS/LITS.json', # competition
 }
 
 
-DISEASE = 'HaN_GTV' 
+DISEASE = 'LITS' 
 MODE = '2d'
-NET_NAME = 'res_unet'
-ENCODER_NAME = 'simplenet'
-VERSION = 'v6.0.3'
+NET_NAME = 'sfnet'
+ENCODER_NAME = 'resnet18' # not important for transformer model and 3d model 
+VERSION = 'testv12.1.2'
 
-DEVICE = '3'
+DEVICE = '2'
 # True if use internal pre-trained model
 # Must be True when pre-training and inference
 PRE_TRAINED = False
@@ -62,58 +62,54 @@ GPU_NUM = len(DEVICE.split(','))
 
 
 with open(json_path[DISEASE], 'r') as fp:
-    info = json.load(fp)
+    DATASET_INFO = json.load(fp)
 
 # Arguments for trainer initialization
 #--------------------------------- single or multiple
 ROI_NUMBER = None# or 1,2,...
-NUM_CLASSES = info['annotation_num'] + 1 # 2 for binary, more for multiple classes
+NUM_CLASSES = DATASET_INFO['annotation_num'] + 1 # 2 for binary, more for multiple classes
 if ROI_NUMBER is not None:
     if isinstance(ROI_NUMBER,list):
         NUM_CLASSES = len(ROI_NUMBER) + 1
         ROI_NAME = 'Part_{}'.format(str(len(ROI_NUMBER)))
     else:
         NUM_CLASSES = 2
-        ROI_NAME = info['annotation_list'][ROI_NUMBER - 1]
+        ROI_NAME = DATASET_INFO['annotation_list'][ROI_NUMBER - 1]
 else:
     ROI_NAME = 'All'
 
-
 try:
-    SCALE = info['scale'][ROI_NAME]
+    SCALE = DATASET_INFO['scale'][ROI_NAME]
     MEAN = STD = None
 except:
     SCALE = None
-    MEAN = info['mean_std']['mean']
-    STD = info['mean_std']['std']
+    MEAN = DATASET_INFO['mean_std']['mean']
+    STD = DATASET_INFO['mean_std']['std']
 #---------------------------------
 
-#--------------------------------- mode and data path setting
-if MODE == '2d_clean':
-    assert ROI_NUMBER is not None, "roi number must not be None in 2d clean"
-    PATH_LIST = get_path_with_annotation(info['2d_data']['csv_path'],'path',ROI_NAME)
-elif MODE == '2d':
-    PATH_LIST = glob.glob(os.path.join(info['2d_data']['save_path'],'*.hdf5'))
-    # PATH_LIST = get_path_with_annotation_ratio(info['2d_data']['csv_path'],'path',ROI_NAME,ratio=0.5)
-else:
-    PATH_LIST = glob.glob(os.path.join(info['3d_data']['save_path'],'*.hdf5'))
-#---------------------------------
 
 
 #--------------------------------- others
-INPUT_SHAPE = (128,128,128) if MODE =='3d' else (512,512)#(512,512)
+INPUT_SHAPE =  (96,96,96) if MODE =='3d' else (512,512)# (128,256,256) #(512,512) #
 BATCH_SIZE = 4 if MODE =='3d' else 32
-
+BASE_LR = 1e-3
+if NET_NAME in ['TransUNet']:
+    BATCH_SIZE = 16
+    BASE_LR = 1e-4
+elif NET_NAME in ['UNETR']:
+    BATCH_SIZE = 6
+    BASE_LR = 1e-4
 
 # CKPT_PATH = './ckpt/{}/{}/{}/{}/fold{}'.format('Covid-Seg',MODE,'v1.0','Lesion',str(CURRENT_FOLD))
 CKPT_PATH = './new_ckpt/{}/{}/{}/{}/fold{}'.format(DISEASE,MODE,VERSION,ROI_NAME,str(CURRENT_FOLD))
 WEIGHT_PATH = get_weight_path(CKPT_PATH)
-print(WEIGHT_PATH)
+
+print(f"WEIGHT_PATH:{WEIGHT_PATH}")
 
 INIT_TRAINER = {
   'net_name':NET_NAME,
   'encoder_name':ENCODER_NAME,
-  'lr':1e-3, 
+  'lr':BASE_LR, 
   'n_epoch':120,
   'channels':1,
   'num_classes':NUM_CLASSES, 
@@ -122,14 +118,14 @@ INIT_TRAINER = {
   'input_shape':INPUT_SHAPE,
   'crop':0,
   'batch_size':BATCH_SIZE,
-  'num_workers':2,
+  'num_workers':16,
   'device':DEVICE,
   'pre_trained':PRE_TRAINED,
   'ex_pre_trained':EX_PRE_TRAINED,
   'ckpt_point':CKPT_POINT,
   'weight_path':WEIGHT_PATH,
   'use_moco':None if 'moco' not in VERSION else 'moco',
-  'weight_decay': 0.0001,
+  'weight_decay': 0.00001,
   'momentum': 0.9,
   'gamma': 0.1,
   'milestones': [30,60,90],
@@ -137,7 +133,8 @@ INIT_TRAINER = {
   'mean':MEAN,
   'std':STD,
   'topk':20,
-  'use_fp16':True, #False if the machine you used without tensor core
+  'use_fp16':False if NET_NAME in __trans_net__  or NET_NAME in __3d_net__ else True, #False if the machine you used without tensor core
+  'mode':MODE,
  }
 #---------------------------------
 
@@ -149,8 +146,8 @@ LOSS_FUN = 'TopkCEPlusDice' if ROI_NUMBER is not None else __loss__[loss_index]
 print('>>>>> loss fun:%s'%LOSS_FUN)
 
 SETUP_TRAINER = {
-  'output_dir':'./new_ckpt/{}/{}/{}/{}'.format(DISEASE,MODE,VERSION,ROI_NAME),
-  'log_dir':'./new_log/{}/{}/{}/{}'.format(DISEASE,MODE,VERSION,ROI_NAME),
+  'output_dir':'./ckpt/{}/{}/{}/{}'.format(DISEASE,MODE,VERSION,ROI_NAME),
+  'log_dir':'./log/{}/{}/{}/{}'.format(DISEASE,MODE,VERSION,ROI_NAME),
   'optimizer':'AdamW',
   'loss_fun':LOSS_FUN,
   'class_weight':None,
@@ -160,6 +157,8 @@ SETUP_TRAINER = {
 }
 #---------------------------------
 
+
+#--------------------------------- test path setting
 TEST_PATH = None
 
 if DISEASE in ['Cervical','Nasopharynx','Lung','Lung_Tumor']:
