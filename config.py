@@ -41,12 +41,12 @@ json_path = {
 
 
 DISEASE = 'LITS' 
-MODE = '2d'
-NET_NAME = 'sfnet'
+MODE = '3d'
+NET_NAME = 'unet_3d_kbr'
 ENCODER_NAME = 'resnet18' # not important for transformer model and 3d model 
-VERSION = 'testv12.1.2'
+VERSION = 'test_kbr_v1.0.0'
 
-DEVICE = '2'
+DEVICE = '1'
 # True if use internal pre-trained model
 # Must be True when pre-training and inference
 PRE_TRAINED = False
@@ -90,8 +90,8 @@ except:
 
 
 #--------------------------------- others
-INPUT_SHAPE =  (96,96,96) if MODE =='3d' else (512,512)# (128,256,256) #(512,512) #
-BATCH_SIZE = 4 if MODE =='3d' else 32
+INPUT_SHAPE =  (256,256,256) if MODE =='3d' else (512,512)# (128,256,256) #(512,512) #
+BATCH_SIZE = 1 if MODE =='3d' else 32
 BASE_LR = 1e-3
 if NET_NAME in ['TransUNet']:
     BATCH_SIZE = 16
@@ -141,7 +141,8 @@ INIT_TRAINER = {
 __loss__ = ['TopKLoss','DiceLoss','CEPlusDice','CELabelSmoothingPlusDice','OHEM','Cross_Entropy']
 # Arguments when perform the trainer 
 loss_index = 0 if len(VERSION.split('.')) == 2 else eval(VERSION.split('.')[-1].split('-')[0])
-LOSS_FUN = 'TopkCEPlusDice' if ROI_NUMBER is not None else __loss__[loss_index]
+# LOSS_FUN = 'TopkCEPlusDice' if ROI_NUMBER is not None else __loss__[loss_index]
+LOSS_FUN = 'Cross_Entropy'
 
 print('>>>>> loss fun:%s'%LOSS_FUN)
 

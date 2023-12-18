@@ -37,7 +37,7 @@ from utils import dfs_remove_weight
 from setproctitle import setproctitle
 from split_train_val import get_cross_validation_by_sample
 from data_utils.data_loader_3d import get_loader as get_loader_3d
-from data_utils.data_loader_3d import DataLoaderArgs
+from data_utils.data_loader_3d import get_kbr_loader, DataLoaderArgs
 import glob
 
 from monai.inferers import sliding_window_inference
@@ -307,15 +307,23 @@ class SemanticSeg(object):
 
             data = data.cuda()
             target = target.cuda()
-
+            data = data.float()
+            # target = target.float()
+            data = data.to(torch.float16)
+            # target = target.to(torch.float16)
             with autocast(self.use_fp16):
                 output = net(data)
                 
                 if isinstance(output,tuple):
                     output = output[0]
-                # print('shape check', data.shape, target.shape, output.shape, target.dtype, output.dtype)
-                # print(output[10:,...])
-                # print(target[10:,...])
+                print('shape check: data.shape, target.shape, output.shape, target.dtype, output.dtype/n')
+                print('shape check', data.shape, target.shape, output.shape, target.dtype, output.dtype)
+                print('output:')
+                print(output)
+                print('target:')
+                print(target)
+                # print('pause')
+                # time.sleep(10)
                 loss = criterion(output,target)
 
             optimizer.zero_grad()
@@ -378,6 +386,10 @@ class SemanticSeg(object):
 
                 data = data.cuda()
                 target = target.cuda()
+                data = data.float()
+                target = target.float()
+                data = data.to(torch.float16)
+                target = target.to(torch.float16)
                 # print('val shape check', data.shape, target.shape, data.dtype, target.dtype)
                 with autocast(self.use_fp16):
                     if self.infer_net is not None:
@@ -438,6 +450,7 @@ class SemanticSeg(object):
             data_loader_args.workers = self.num_workers
             data_loader_args.data_dir = dataset_info['nii_path']
             data_loader_args.json_list = dataset_info['dataset_json_path']
+            # data_loader_args.csc_dir = dataset_info['csv_path']
             data_loader_args.space_x = 1.0
             data_loader_args.space_y = 1.0
             data_loader_args.space_z = 1.0
@@ -456,7 +469,7 @@ class SemanticSeg(object):
             data_loader_args.use_normal_dataset = False
             data_loader_args.distributed = False
             data_loader_args.num_classes = self.num_classes
-            return get_loader_3d(data_loader_args)
+            return get_kbr_loader(data_loader_args)# get_loader_3d(data_loader_args)
             
         else:
             if self.mode == '2d_clean':
@@ -567,8 +580,12 @@ class SemanticSeg(object):
 
                 data = data.cuda()
                 target = target.cuda() #N
-
+                data = data.float()
+                target = target.float()
+                data = data.to(torch.float16)
+                target = target.to(torch.float16)
                 with autocast(self.use_fp16):
+                    # print(type(data))
                     output = net(data)
                     if isinstance(output,tuple):
                         output = output[0]
@@ -602,8 +619,13 @@ class SemanticSeg(object):
             from model.old_unet import unet_3d
             net = unet_3d(n_channels=self.channels,n_classes=self.num_classes)
 
+        elif net_name == 'unet_3d_kbr':
+            from model.old_unet import unet_3d_kbr
+            net = unet_3d_kbr(n_channels=self.channels,n_classes=self.num_classes)
+
         elif net_name == 'da_unet':
             from model.da_unet import da_unet
+            # print(self.input_shape[0])
             net = da_unet(init_depth=self.input_shape[0],n_channels=self.channels,n_classes=self.num_classes)
         
         elif net_name == 'vnet_lite':

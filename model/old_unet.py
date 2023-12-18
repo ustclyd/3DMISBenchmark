@@ -176,6 +176,50 @@ class UNet(nn.Module):
             x = self.dropout(x)
         logits = self.outc(x)
         return logits
+    
+class UNet_KBR(nn.Module):
+    def __init__(self, stem, down, up, tail, width, conv_builder, n_channels=1, n_classes=2, dropout_flag=True):
+        super(UNet_KBR, self).__init__()
+        self.n_channels = n_channels
+        self.n_classes = n_classes
+        self.width = width
+        self.dropout_flag = dropout_flag
+        factor = 2 
+
+        self.inc = stem(n_channels, width[0])
+        self.down1 = down(width[0], width[1], conv_builder)
+        self.down2 = down(width[1], width[2], conv_builder)
+        self.down3 = down(width[2], width[3], conv_builder)
+        self.down4 = down(width[3], width[4] // factor, conv_builder)
+        self.up1 = up(width[4], width[3] // factor, conv_builder)
+        self.up2 = up(width[3], width[2]// factor, conv_builder)
+        self.up3 = up(width[2], width[1] // factor, conv_builder)
+        self.up4 = up(width[1], width[0], conv_builder)
+        self.dropout = nn.Dropout(p=0.5)
+        self.outc = tail(width[0], 2)
+        self.zero_one = nn.Sigmoid()
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+
+        x = self.up1(x5, x4)
+        x = self.up2(x, x3)
+        x = self.up3(x, x2)
+        x = self.up4(x, x1)
+        if self.dropout_flag:
+            x = self.dropout(x)
+        logits = self.outc(x)
+        kbr_logits = nn.Sigmoid()(logits)
+        # print(kbr_logits.shape)
+        # print(kbr_logits)
+        # predict = torch.where(logits>0.5,torch.ones_like(logits),torch.zeros_like(logits))
+        # print(predict.shape)
+        # print(predict)
+        return kbr_logits
 
 
 
@@ -198,20 +242,29 @@ def unet_3d(**kwargs):
                 conv_builder=DoubleConv3D,
                 **kwargs)
 
+def unet_3d_kbr(**kwargs):
+    return UNet_KBR(stem=DoubleConv3D,
+                down=Down3D,
+                up=Up3D,
+                tail=Tail3D,
+                width=[32,64,128,256,512],
+                conv_builder=DoubleConv3D,
+                **kwargs)
+
 
 if __name__ == "__main__":
   
-  net = unet_2d(n_channels=1, n_classes=2)
+  net = unet_3d(n_channels=1, n_classes=2)
 #   net = unet_3d(n_channels=1, n_classes=2)
 
   from torchsummary import summary
   import os 
-  os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+  os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 #   summary(net.cuda(),input_size=(1,128,128,128),batch_size=1,device='cuda')
-  summary(net.cuda(),input_size=(1,512,512),batch_size=1,device='cuda')
+  summary(net.cuda(),input_size=(1,128,128,128),batch_size=1,device='cuda')
   import sys
   sys.path.append('..')
   from utils import count_params_and_macs
 #   count_params_and_macs(net.cuda(),(1,1,128,128,128))
-  count_params_and_macs(net.cuda(),(1,1,512,512))
+  count_params_and_macs(net.cuda(),(1,1,128,128,128))

@@ -11,12 +11,14 @@
 
 import math
 import os
-
+import pandas as pd
 import numpy as np
 import torch
+import pickle
 
 from monai import data, transforms
 from monai.data import load_decathlon_datalist
+from torch.utils.data import Dataset
 
 class DataLoaderArgs:
     pass
@@ -191,6 +193,134 @@ def get_loader(args):
             shuffle=False,
             num_workers=args.workers,
             sampler=val_sampler,
+            pin_memory=False,
+            persistent_workers=False,
+        )
+        loader = [train_loader, val_loader]
+
+    return loader
+
+
+class KBR_DataGenerator(Dataset):
+    '''
+    Custom Dataset class for data loader.
+    Args：
+    - path_list: list of file path
+    - roi_number: integer or None, to extract the corresponding label
+    - num_class: the number of classes of the label
+    - transform: the data augmentation methods
+    '''
+    def __init__(self, data_dict_list, roi_number=None, num_class=2, transform=None):
+
+        self.data_dict_list = data_dict_list
+        self.roi_number = roi_number
+        self.num_class = num_class
+        self.transform = transform
+
+
+    def __len__(self):
+        return len(self.data_dict_list)
+
+
+    def __getitem__(self,index):
+        # Get image and label
+        # image: (D,H,W) or (H,W) 
+        # label: same shape with image, integer, [0,1,...,num_class]
+        f = open(self.data_dict_list[index]['image'],'rb')
+        image = pickle.load(f)
+        f.close()
+
+        f = open(self.data_dict_list[index]['label'],'rb')
+        label = pickle.load(f)
+        f.close()
+        # image = hdf5_reader(self.path_list[index],'image')
+        # label = hdf5_reader(self.path_list[index],'label')
+        if self.roi_number is not None:
+            if isinstance(self.roi_number,list):
+                tmp_mask = np.zeros_like(label,dtype=np.float32)
+                assert self.num_class == len(self.roi_number) + 1
+                for i, roi in enumerate(self.roi_number):
+                    tmp_mask[label == roi] = i+1
+                label = tmp_mask
+            else:
+                assert self.num_class == 2
+                label = (label==self.roi_number).astype(np.float32) 
+
+        image = 1*image.reshape(1,256,256,256)
+        label = 1*label.reshape(1,256,256,256)
+        # print(type(image))
+        # print(image.shape)
+        sample = {'image':image, 'label':label}
+        # Transform
+        if self.transform is not None:
+            sample = self.transform(sample)
+
+        # print(type(sample['image']))
+        # print(sample['image'].shape)
+        return sample
+
+
+def load_kbr_datalist(csv_path, data_list_key):
+
+    df = pd.read_csv(csv_path)
+    if data_list_key == 'training':
+        df = df[df['split'] == 'training']
+        
+        image_list = df['train_filepath'].tolist()
+        label = df['gt_filepath'].tolist()
+        data_dict =  [{'image': image, 'label': label} for image, label in zip(image_list, label)]
+    else:
+        df = df[df['split'] == 'validation']
+        
+        image_list = df['train_filepath'].tolist()
+        label = df['gt_filepath'].tolist()
+        data_dict =  [{'image': image, 'label': label} for image, label in zip(image_list, label)]
+
+    return data_dict
+
+
+
+
+
+def get_kbr_loader(args):
+    csv_path = "/staff/ydli/projects/3DMISBenchmark/UNet_data.csv"
+
+    if args.test_mode:
+        test_files = load_kbr_datalist(csv_path, "validation")
+        test_ds = KBR_DataGenerator(test_files, roi_number=None, num_class=2, transform=None)
+        test_loader = data.DataLoader(
+            test_ds,
+            batch_size=1,
+            shuffle=False,
+            num_workers=args.workers,
+            sampler=None,
+            pin_memory=False,
+            persistent_workers=False,
+        )
+        loader = test_loader
+    else:
+        datalist = load_kbr_datalist(csv_path, "training")
+        # print("3d datalist", datalist)
+       
+        train_ds = KBR_DataGenerator(datalist, roi_number=None, num_class=2, transform=None)
+       
+        train_loader = data.DataLoader(
+            train_ds,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.workers,
+            sampler=None,
+            pin_memory=False,
+            persistent_workers=False,
+        )
+        val_files = load_kbr_datalist(csv_path, "validation")
+        val_ds = KBR_DataGenerator(val_files, roi_number=None, num_class=2, transform=None)
+        val_loader = data.DataLoader(
+            val_ds,
+            batch_size=1,
+            shuffle=False,
+            num_workers=args.workers,
+            sampler=None,
             pin_memory=False,
             persistent_workers=False,
         )
